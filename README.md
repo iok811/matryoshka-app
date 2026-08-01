@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/30616518/README.md)
+[README.md](https://github.com/user-attachments/files/30616582/README.md)
 # Матрёшка — app standalone
 
 Versione indipendente dell'app, con salvataggio reale (database Postgres, es. Neon
