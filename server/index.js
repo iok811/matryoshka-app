@@ -19,28 +19,44 @@ app.use(express.json({ limit: "2mb" }));
 // con l'id dell'utente autenticato (es. da un cookie di sessione).
 const USER_ID = "local";
 
-app.get("/api/storage/:key", (req, res) => {
-  const result = storageGet(USER_ID, req.params.key);
-  res.json(result);
+app.get("/api/storage/:key", async (req, res) => {
+  try {
+    const result = await storageGet(USER_ID, req.params.key);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: "Errore database: " + e.message });
+  }
 });
 
-app.post("/api/storage/:key", (req, res) => {
+app.post("/api/storage/:key", async (req, res) => {
   const { value } = req.body || {};
   if (typeof value !== "string") {
     return res.status(400).json({ error: "Campo 'value' mancante (deve essere una stringa)." });
   }
-  const result = storageSet(USER_ID, req.params.key, value);
-  res.json(result);
+  try {
+    const result = await storageSet(USER_ID, req.params.key, value);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: "Errore database: " + e.message });
+  }
 });
 
-app.delete("/api/storage/:key", (req, res) => {
-  const result = storageDelete(USER_ID, req.params.key);
-  res.json(result);
+app.delete("/api/storage/:key", async (req, res) => {
+  try {
+    const result = await storageDelete(USER_ID, req.params.key);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: "Errore database: " + e.message });
+  }
 });
 
-app.get("/api/storage", (req, res) => {
-  const prefix = req.query.prefix || "";
-  res.json(storageList(USER_ID, prefix));
+app.get("/api/storage", async (req, res) => {
+  try {
+    const prefix = req.query.prefix || "";
+    res.json(await storageList(USER_ID, prefix));
+  } catch (e) {
+    res.status(500).json({ error: "Errore database: " + e.message });
+  }
 });
 
 app.use("/api", claudeRouter);
