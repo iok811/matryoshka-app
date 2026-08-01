@@ -1,33 +1,46 @@
+[README.md](https://github.com/user-attachments/files/30616518/README.md)
 # Матрёшка — app standalone
 
-Versione indipendente dell'app, con salvataggio reale (SQLite) e generazione IA
-tramite una tua chiave API Anthropic — non dipende più dagli artifact di Claude.ai.
+Versione indipendente dell'app, con salvataggio reale (database Postgres, es. Neon
+gratuito) e generazione IA tramite una tua chiave API Anthropic — non dipende
+più dagli artifact di Claude.ai.
 
 ## Struttura
 
 ```
 matryoshka-app/
-  server/     backend Express + SQLite + proxy verso l'API Anthropic
+  server/     backend Express + Postgres + proxy verso l'API Anthropic
   client/     frontend React (Vite) — lo stesso codice dell'artifact, adattato
 ```
 
-## 1. Ottieni una chiave API Anthropic
+## 1. Crea un database Postgres gratuito su Neon
+
+1. Vai su https://neon.tech e crea un account gratuito
+2. Crea un nuovo progetto (bastano pochi secondi)
+3. Nella dashboard del progetto, copia la **Connection string** — un indirizzo
+   che inizia con `postgresql://...` — ti servirà tra poco
+4. Il piano gratuito di Neon non ha scadenza e non si "addormenta" cancellando
+   i dati, a differenza del filesystem gratuito di Render
+
+## 2. Ottieni una chiave API Anthropic
 
 1. Vai su https://console.anthropic.com
 2. Crea un account (se non l'hai già) e vai su **API Keys**
 3. Crea una chiave e copiala
 4. Nota: questo è un account **separato** dal tuo abbonamento Claude.ai — l'uso dell'API si paga a consumo (in genere pochi centesimi per lezione generata; puoi impostare un tetto di spesa in console)
 
-## 2. Configura il server
+## 3. Configura il server
 
 ```bash
 cd server
 npm install
 cp .env.example .env
-# apri .env e incolla la tua chiave: ANTHROPIC_API_KEY=sk-ant-...
+# apri .env e incolla:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#   DATABASE_URL=postgresql://... (quella copiata da Neon)
 ```
 
-## 3. Avvia in sviluppo (due terminali)
+## 4. Avvia in sviluppo (due terminali)
 
 ```bash
 # terminale 1
@@ -42,7 +55,7 @@ npm run dev
 Apri http://localhost:5173 — il frontend Vite inoltra automaticamente le
 chiamate `/api/...` al server su `localhost:3001`.
 
-## 4. Build per produzione
+## 5. Build per produzione
 
 ```bash
 cd client
@@ -54,20 +67,20 @@ npm start
 Apri http://localhost:3001 — il server ora serve anche il frontend compilato
 dalla cartella `client/dist`, tutto da un solo processo.
 
-## 5. Pubblicarla online (accesso stabile da telefono)
+## 6. Pubblicarla online (accesso stabile da telefono)
 
-Qualunque host che supporti Node.js va bene. Due opzioni semplici e con piano
-gratuito/economico:
+Qualunque host che supporti Node.js va bene.
 
 **Render.com** (consigliato per iniziare)
 1. Crea un repository Git con questa cartella
 2. Su Render: New → Web Service → collega il repository
 3. Build command: `cd client && npm install && npm run build && cd ../server && npm install`
 4. Start command: `cd server && npm start`
-5. Aggiungi la variabile d'ambiente `ANTHROPIC_API_KEY` nelle impostazioni del servizio
-6. Aggiungi un **Persistent Disk** (Render lo offre a pagamento minimo) montato su `server/` così il file `matryoshka.db` non si perde ad ogni deploy — altrimenti lo storage si resetta ogni volta che il servizio riparte
-
-**Railway.app** — flusso simile, con storage persistente incluso più facilmente nel piano gratuito iniziale.
+5. Aggiungi le variabili d'ambiente nelle impostazioni del servizio (sezione Environment):
+   - `ANTHROPIC_API_KEY`
+   - `DATABASE_URL` (la connection string di Neon)
+6. Non serve nessun Persistent Disk: il database vive su Neon, non sul filesystem
+   di Render — i dati sopravvivono a riavvii, addormentamenti e redeploy del servizio
 
 Una volta pubblicata, apri l'URL fornito dal servizio da Safari su iPhone e
 aggiungila alla schermata Home per un'esperienza da app quasi nativa.
@@ -75,8 +88,8 @@ aggiungila alla schermata Home per un'esperienza da app quasi nativa.
 ## Cosa è cambiato rispetto alla versione artifact
 
 - `window.storage` → chiamate REST a `/api/storage/:key`, salvate in un vero
-  database SQLite (`server/matryoshka.db`) — persistente per sempre, non serve
-  "pubblicare" nulla su Claude.ai.
+  database Postgres esterno (Neon) — persistente per sempre, indipendente dal
+  ciclo di vita del server, non serve "pubblicare" nulla su Claude.ai.
 - Le chiamate a `api.anthropic.com` ora passano dal tuo server (`/api/claude`),
   che usa la tua chiave API — nessun limite artificiale di `max_tokens: 1000`,
   quindi la generazione di una lezione è tornata a essere **una sola chiamata**
@@ -86,3 +99,12 @@ aggiungila alla schermata Home per un'esperienza da app quasi nativa.
   automatici per errori di rete o del server genuinamente transitori.
 - La voce premium ElevenLabs funziona esattamente come prima (chiamata diretta
   dal browser con la tua chiave, inserita nelle impostazioni dell'app).
+
+## Perché Neon invece di SQLite locale
+
+La prima versione di questa app usava SQLite salvato direttamente sul disco
+del server. Su Render, il piano gratuito ha un filesystem "usa e getta": ogni
+volta che il servizio si riavvia (anche solo per il normale addormentamento
+dopo inattività) i file locali vengono cancellati, e con loro i progressi
+salvati. Neon è un database esterno indipendente dal server, quindi i dati
+restano anche quando Render riavvia o riaddormenta il servizio.
