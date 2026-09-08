@@ -1,35 +1,42 @@
-[README.md](https://github.com/user-attachments/files/30616582/README.md)
-# Матрёшка — app standalone
+[README.md](https://github.com/user-attachments/files/31955649/README.md)
+# Матрёшка Мариса
 
-Versione indipendente dell'app, con salvataggio reale (database Postgres, es. Neon
-gratuito) e generazione IA tramite una tua chiave API Anthropic — non dipende
-più dagli artifact di Claude.ai.
+App per imparare il russo (italiano → russo), pensata per la pubblicazione su App
+Store e Google Play, con un livello gratuito (A1) e un abbonamento (annuale o
+"vita intera") per i livelli A2-C2, gestito tramite RevenueCat.
 
 ## Struttura
 
 ```
 matryoshka-app/
-  server/     backend Express + Postgres + proxy verso l'API Anthropic
-  client/     frontend React (Vite) — lo stesso codice dell'artifact, adattato
+  server/     backend Express — solo proxy per le chiamate IA (Claude, ElevenLabs).
+              Non salva mai i progressi degli utenti: nessun database richiesto.
+  client/     frontend React (Vite) + Capacitor per le build native iOS/Android
+  tests/      suite di test automatici (integrità dati + regressione UI)
+  docs/       documentazione pronta per la pubblicazione sugli store
 ```
 
-## 1. Crea un database Postgres gratuito su Neon
+## Dove vivono i dati dell'utente
 
-1. Vai su https://neon.tech e crea un account gratuito
-2. Crea un nuovo progetto (bastano pochi secondi)
-3. Nella dashboard del progetto, copia la **Connection string** — un indirizzo
-   che inizia con `postgresql://...` — ti servirà tra poco
-4. Il piano gratuito di Neon non ha scadenza e non si "addormenta" cancellando
-   i dati, a differenza del filesystem gratuito di Render
+**Sul dispositivo, mai su un server**: progressi, lezioni completate, pacchetti
+generati e impostazioni sono salvati tramite `@capacitor/filesystem` nelle build
+native, o `localStorage` se l'app gira in un browser normale. Il server non ha
+un database e non lo richiede — la sua unica funzione è fare da proxy verso i
+servizi IA (Claude per la generazione di contenuti, ElevenLabs per la voce
+madrelingua inclusa nell'abbonamento), usando chiavi che restano lato server e
+non vengono mai esposte al client.
 
-## 2. Ottieni una chiave API Anthropic
+## 1. Ottieni le chiavi API necessarie
 
-1. Vai su https://console.anthropic.com
-2. Crea un account (se non l'hai già) e vai su **API Keys**
-3. Crea una chiave e copiala
-4. Nota: questo è un account **separato** dal tuo abbonamento Claude.ai — l'uso dell'API si paga a consumo (in genere pochi centesimi per lezione generata; puoi impostare un tetto di spesa in console)
+- **Anthropic** (per la generazione di lezioni/esercizi): crea un account su
+  https://console.anthropic.com, vai su **API Keys** e creane una. È un account
+  separato da un eventuale abbonamento Claude.ai — l'uso dell'API si paga a
+  consumo (puoi impostare un tetto di spesa in console).
+- **ElevenLabs** (per la voce madrelingua inclusa nell'abbonamento): crea un
+  account su https://elevenlabs.io e copia la tua API key dalle impostazioni
+  dell'account.
 
-## 3. Configura il server
+## 2. Configura il server
 
 ```bash
 cd server
@@ -37,8 +44,24 @@ npm install
 cp .env.example .env
 # apri .env e incolla:
 #   ANTHROPIC_API_KEY=sk-ant-...
-#   DATABASE_URL=postgresql://... (quella copiata da Neon)
+#   ELEVENLABS_API_KEY=...
 ```
+
+## 3. Configura l'abbonamento (RevenueCat)
+
+1. Crea un account su https://www.revenuecat.com
+2. Crea un progetto, e al suo interno un **entitlement** chiamato `premium`
+3. Crea i due prodotti (abbonamento annuale + acquisto "vita intera") in App
+   Store Connect / Google Play Console, poi collegali come pacchetti
+   `$rc_annual` / `$rc_lifetime` nell'offerta RevenueCat, entrambi legati
+   all'entitlement `premium`
+4. Copia le due chiavi pubbliche (iOS e Android) da RevenueCat e sostituiscile
+   in `client/src/App.jsx` al posto di `REVENUECAT_API_KEY_IOS` /
+   `REVENUECAT_API_KEY_ANDROID` (cerca `REPLACE_WITH_` nel file)
+
+Senza queste chiavi l'app funziona comunque: l'abbonamento risulta semplicemente
+sempre "non attivo" invece di andare in errore, quindi puoi sviluppare e
+testare il resto senza fretta di configurare questa parte.
 
 ## 4. Avvia in sviluppo (due terminali)
 
@@ -55,7 +78,7 @@ npm run dev
 Apri http://localhost:5173 — il frontend Vite inoltra automaticamente le
 chiamate `/api/...` al server su `localhost:3001`.
 
-## 5. Build per produzione
+## 5. Build per il web (facoltativo, utile per test rapidi)
 
 ```bash
 cd client
@@ -65,46 +88,50 @@ npm start
 ```
 
 Apri http://localhost:3001 — il server ora serve anche il frontend compilato
-dalla cartella `client/dist`, tutto da un solo processo.
+dalla cartella `client/dist`, tutto da un solo processo. Utile per un test
+rapido da browser, ma **non è il percorso di pubblicazione principale**: per
+quello vedi il punto successivo.
 
-## 6. Pubblicarla online (accesso stabile da telefono)
+## 6. Build nativa per App Store / Google Play
 
-Qualunque host che supporti Node.js va bene.
+```bash
+cd client
+npm install
+npm run build
+npx cap sync
+npx cap open ios       # apre Xcode
+npx cap open android    # apre Android Studio
+```
 
-**Render.com** (consigliato per iniziare)
-1. Crea un repository Git con questa cartella
-2. Su Render: New → Web Service → collega il repository
-3. Build command: `cd client && npm install && npm run build && cd ../server && npm install`
-4. Start command: `cd server && npm start`
-5. Aggiungi le variabili d'ambiente nelle impostazioni del servizio (sezione Environment):
-   - `ANTHROPIC_API_KEY`
-   - `DATABASE_URL` (la connection string di Neon)
-6. Non serve nessun Persistent Disk: il database vive su Neon, non sul filesystem
-   di Render — i dati sopravvivono a riavvii, addormentamenti e redeploy del servizio
+Da lì, segui la documentazione già pronta in `docs/`:
 
-Una volta pubblicata, apri l'URL fornito dal servizio da Safari su iPhone e
-aggiungila alla schermata Home per un'esperienza da app quasi nativa.
+- `docs/note-revisore-e-permessi.md` — note per il revisore Apple, permessi da
+  dichiarare, checklist finale prima dell'invio
+- `docs/guida-google-play.md` — passaggi equivalenti per Google Play
+- `docs/app-store-scheda.md` — testi pronti per la scheda dello store
+- `docs/privacy-policy.md` — informativa privacy da pubblicare su un URL
+  pubblico e collegare in App Store Connect
+- `docs/mappa-freemium.md` — la logica di cosa è gratuito (A1) e cosa richiede
+  l'abbonamento (A2-C2), già implementata nel codice
 
-## Cosa è cambiato rispetto alla versione artifact
+## Test automatici
 
-- `window.storage` → chiamate REST a `/api/storage/:key`, salvate in un vero
-  database Postgres esterno (Neon) — persistente per sempre, indipendente dal
-  ciclo di vita del server, non serve "pubblicare" nulla su Claude.ai.
-- Le chiamate a `api.anthropic.com` ora passano dal tuo server (`/api/claude`),
-  che usa la tua chiave API — nessun limite artificiale di `max_tokens: 1000`,
-  quindi la generazione di una lezione è tornata a essere **una sola chiamata**
-  invece di due.
-- Rimossa la pausa artificiale di 400ms pre-fetch (era una mitigazione per un
-  bug di Safari specifico dell'ambiente artifact) — restano i ritentativi
-  automatici per errori di rete o del server genuinamente transitori.
-- La voce premium ElevenLabs funziona esattamente come prima (chiamata diretta
-  dal browser con la tua chiave, inserita nelle impostazioni dell'app).
+```bash
+cd tests
+npm install
+node data-integrity-test.mjs   # verifica il contenuto didattico (lezioni, dialoghi, grammatica)
+node ui-smoke-test.mjs         # verifica che l'app si monti e le sezioni principali si aprano
+```
 
-## Perché Neon invece di SQLite locale
+Da eseguire dopo ogni modifica a `client/src/App.jsx` o ai file in
+`client/src/data/`.
 
-La prima versione di questa app usava SQLite salvato direttamente sul disco
-del server. Su Render, il piano gratuito ha un filesystem "usa e getta": ogni
-volta che il servizio si riavvia (anche solo per il normale addormentamento
-dopo inattività) i file locali vengono cancellati, e con loro i progressi
-salvati. Neon è un database esterno indipendente dal server, quindi i dati
-restano anche quando Render riavvia o riaddormenta il servizio.
+## Se in futuro vuoi il sync tra dispositivi
+
+Oggi i progressi restano solo sul dispositivo per scelta (più semplice, più
+in linea con quanto dichiarato nella privacy policy, nessun costo di database
+da sostenere). Se in futuro vorrai aggiungere il sync tra dispositivi per gli
+utenti abbonati, `server/db.js` contiene già un'implementazione funzionante
+per un database Postgres esterno (es. [Neon](https://neon.tech), piano
+gratuito) — oggi non importata da nessuna parte, ma pronta da ricollegare a
+`server/index.js` se deciderai di aggiungere questa funzione.
