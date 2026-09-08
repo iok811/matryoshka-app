@@ -3,8 +3,8 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
-import { storageGet, storageSet, storageDelete, storageList } from "./db.js";
 import claudeRouter from "./claude.js";
+import ttsRouter from "./tts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -15,51 +15,16 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
-// Utente unico locale: se un giorno aggiungi login, sostituisci "local"
-// con l'id dell'utente autenticato (es. da un cookie di sessione).
-const USER_ID = "local";
-
-app.get("/api/storage/:key", async (req, res) => {
-  try {
-    const result = await storageGet(USER_ID, req.params.key);
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: "Errore database: " + e.message });
-  }
-});
-
-app.post("/api/storage/:key", async (req, res) => {
-  const { value } = req.body || {};
-  if (typeof value !== "string") {
-    return res.status(400).json({ error: "Campo 'value' mancante (deve essere una stringa)." });
-  }
-  try {
-    const result = await storageSet(USER_ID, req.params.key, value);
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: "Errore database: " + e.message });
-  }
-});
-
-app.delete("/api/storage/:key", async (req, res) => {
-  try {
-    const result = await storageDelete(USER_ID, req.params.key);
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: "Errore database: " + e.message });
-  }
-});
-
-app.get("/api/storage", async (req, res) => {
-  try {
-    const prefix = req.query.prefix || "";
-    res.json(await storageList(USER_ID, prefix));
-  } catch (e) {
-    res.status(500).json({ error: "Errore database: " + e.message });
-  }
-});
-
+// NOTA: le vecchie rotte /api/storage sono state rimosse. I progressi utente ora
+// vivono sul dispositivo (Filesystem su Capacitor nativo, localStorage nel browser),
+// mai sul server — sia per restare coerenti con quanto dichiarato al revisore Apple
+// (offline-capable, dati locali), sia perché la versione precedente salvava tutti
+// gli utenti sotto un unico USER_ID="local", facendo collidere i dati di persone
+// diverse in produzione. Questo server resta solo il proxy per le chiamate Claude
+// (generazione di pacchetti/lezioni IA), l'unica funzione che ha davvero bisogno
+// di un server.
 app.use("/api", claudeRouter);
+app.use("/api", ttsRouter);
 
 // Serve il frontend compilato (dopo `npm run build` nella cartella client)
 const clientDist = path.join(__dirname, "..", "client", "dist");
