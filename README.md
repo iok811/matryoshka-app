@@ -1,8 +1,8 @@
 # Матрёшка Мариса
 
 App per imparare il russo (italiano → russo), pensata per la pubblicazione su App
-Store e Google Play, con un livello gratuito (A1) e un abbonamento (annuale o
-"vita intera") per i livelli A2-C2, gestito tramite RevenueCat.
+Store e Google Play, con due livelli gratuiti (A1 e A2) e un abbonamento
+(annuale o "vita intera") per i livelli B1-C2, gestito tramite RevenueCat.
 
 ## Struttura
 
@@ -110,8 +110,10 @@ Da lì, segui la documentazione già pronta in `docs/`:
 - `docs/app-store-scheda.md` — testi pronti per la scheda dello store
 - `docs/privacy-policy.md` — informativa privacy da pubblicare su un URL
   pubblico e collegare in App Store Connect
-- `docs/mappa-freemium.md` — la logica di cosa è gratuito (A1) e cosa richiede
-  l'abbonamento (A2-C2), già implementata nel codice
+- `docs/termini-di-servizio.md` — termini di servizio, stessa via di
+  pubblicazione della privacy policy
+- `docs/mappa-freemium.md` — la logica di cosa è gratuito (A1 e A2) e cosa
+  richiede l'abbonamento (B1-C2), già implementata nel codice
 
 ## Test automatici
 
